@@ -1,0 +1,4 @@
+(executable
+ (public_name sudoku_smt)
+ (name main)
+ (libraries base stdio z3))
