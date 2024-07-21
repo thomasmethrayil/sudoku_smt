@@ -1,132 +1,141 @@
 open Base
+open Base.Printf
 open Z3
 open Z3.Arithmetic
 open Z3.Solver
 
-type sudokuGrid =
-  | Unsolved of int option array array
-  | Solved of string array array;;
+let split_sudoku_rows sudoku_string = sudoku_string |> String.split ~on:(',') |> List.to_array;;
 
-let splitSudokuRows sudokuString = sudokuString |> String.split ~on:(',') |> List.to_array;;
-
-let splitRowIntCells rowString =
-  Array.init (String.length rowString) ~f:(String.get rowString)
+let split_row_to_int_cells row_string =
+  Array.init (String.length row_string) ~f:(String.get row_string)
   |> Array.map ~f: (fun c -> if Char.is_digit c then Some (Char.to_int c) else None);;
 
-(* let splitRowsToStringGrid rowString = String.to_array rowString |> Array.map ~f:(fun c -> String.of_char c);;*)
+let split_rows_to_int_grid string_array = string_array |> Array.map ~f:(fun s -> split_row_to_int_cells s);;
 
-let splitRowsToIntGrid stringArray = stringArray |> Array.map ~f:(fun s -> splitRowIntCells s);;
+let parse_sudoku_string sudoku_string = split_sudoku_rows sudoku_string |> split_rows_to_int_grid;;
 
-let parseSudokuString sudokuString = splitSudokuRows sudokuString |> splitRowsToIntGrid;;
+let initialize_expr_grid grid_dimension ctx =
+  let position_name = Printf.sprintf "x_%d_%d" in
+  let initialize_single_expr_row (row_index : int) =
+    Array.init grid_dimension ~f:(fun col_index -> Integer.mk_const_s ctx (position_name row_index col_index)) in
+  Array.init grid_dimension ~f:(fun ri -> initialize_single_expr_row ri);;
 
-let initializeExprGrid gridDimension ctx =
-  let positionName = Printf.sprintf "x_%d_%d" in
-  let initializeSingleExprRow (rowIndex : int) =
-    Array.init gridDimension ~f:(fun colIndex -> Integer.mk_const_s ctx (positionName rowIndex colIndex)) in
-  Array.init gridDimension ~f:(fun ri -> initializeSingleExprRow ri);;
-
-let makeCellConstraints grid exprGrid rowIndex colIndex ctx =
-  let currentPosition = exprGrid.(rowIndex).(colIndex) in
-  match grid.(rowIndex).(colIndex) with
-  | Some num -> Boolean.mk_eq ctx currentPosition (Integer.mk_numeral_i ctx num)
+let make_cell_constraints grid expr_grid row_index col_index ctx =
+  let current_position = expr_grid.(row_index).(col_index) in
+  match grid.(row_index).(col_index) with
+  | Some num -> Boolean.mk_eq ctx current_position (Integer.mk_numeral_i ctx num)
   | None ->
-    let gt0, le9 =
-    mk_ge ctx currentPosition (Integer.mk_numeral_i ctx 0), mk_le ctx currentPosition (Integer.mk_numeral_i ctx 9) in
-    Boolean.mk_and ctx [gt0; le9];;
+    let gt_0, le_9 =
+    mk_ge ctx current_position (Integer.mk_numeral_i ctx 0), mk_le ctx current_position (Integer.mk_numeral_i ctx 9) in
+    Boolean.mk_and ctx [gt_0; le_9];;
 
-let getRowConstraints exprRow ctx =
-  exprRow
+let get_row_constraints expr_row ctx =
+  expr_row
   |> Array.to_list
   |> Boolean.mk_distinct ctx;;
 
-let getColumnConstraints exprGrid colIndex ctx =
-  exprGrid
-  |> Array.map ~f:(fun ea -> ea.(colIndex))
+let get_column_constraints expr_grid col_index ctx =
+  expr_grid
+  |> Array.map ~f:(fun ea -> ea.(col_index))
   |> Array.to_list
   |> Boolean.mk_distinct ctx;;
 
-let getSubgridCoordinates gridDim =
+let get_subgrid_coordinates grid_dim =
   (* we're assuming perfect input from user *)
-  let subgridLength = Float.sqrt (Int.to_float gridDim) |> Int.of_float in
-  let subgridBorders = List.init (subgridLength + 1) ~f:(fun i -> i * subgridLength) in
-  let subgridCorners = List.cartesian_product subgridBorders subgridBorders in
-  let subgridSquares =
-    subgridCorners
+  let subgrid_length = Float.sqrt (Int.to_float grid_dim) |> Int.of_float in
+  let subgrid_borders = List.init (subgrid_length + 1) ~f:(fun i -> i * subgrid_length) in
+  let subgrid_corners = List.cartesian_product subgrid_borders subgrid_borders in
+  let subgrid_squares =
+    subgrid_corners
     |> List.map ~f:(fun (x,y) ->
-      subgridCorners
+      subgrid_corners
       |> List.fold ~init:([]) ~f:(fun acc (x1,y1) ->
-        if (x1 - x = subgridLength) && (y1 - y = subgridLength) then ((x,y), (x1,y1))::acc else acc))
+        if (x1 - x = subgrid_length) && (y1 - y = subgrid_length) then ((x,y), (x1,y1))::acc else acc))
     |> List.filter ~f:(fun l -> (List.is_empty l) |> not)
     |> List.concat in
-  let rows ((row1st,_),(rowLast, _)) = List.init (rowLast - row1st) ~f:(fun i -> row1st + i) in
-  let columns ((_,column1st),(_, columnLast)) = List.init (columnLast - column1st) ~f:(fun i -> column1st + i) in
-  subgridSquares
+  let rows ((row_1st,_),(row_last, _)) = List.init (row_last - row_1st) ~f:(fun i -> row_1st + i) in
+  let columns ((_,column_1st),(_, column_last)) = List.init (column_last - column_1st) ~f:(fun i -> column_1st + i) in
+  subgrid_squares
   |> List.map ~f:(fun coords ->
     rows coords
     |> List.fold ~init:([]) ~f: (fun acc x ->
       columns coords
       |> List.fold ~init:(acc) ~f:(fun acc y -> (x,y)::acc)));;
 
-let getSubgridConstraints exprGrid gridLength ctx =
-  getSubgridCoordinates gridLength
+let get_subgrid_constraints expr_grid grid_length ctx =
+  get_subgrid_coordinates grid_length
   |> List.map ~f:(fun subgrid ->
     subgrid
-    |> List.map ~f:(fun (x,y) -> exprGrid.(x).(y)))
-  |> List.map ~f:(fun subExprGrid -> Boolean.mk_distinct ctx subExprGrid);;
+    |> List.map ~f:(fun (x,y) -> expr_grid.(x).(y)))
+  |> List.map ~f:(fun expr_subgrid -> Boolean.mk_distinct ctx expr_subgrid);;
 
-let solveSudoku unsolvedGrid =
-  let z3Context = mk_context [] in
-  let gridDimension = Array.length unsolvedGrid in
-  let exprGrid = initializeExprGrid gridDimension z3Context in
-  let solver = mk_simple_solver z3Context in
-  let subgridConstraints = getSubgridConstraints exprGrid gridDimension z3Context in
+let solve_sudoku unsolved_grid =
+  let z3_context = mk_context [] in
+  let grid_dimension = Array.length unsolved_grid in
+  let expr_grid = initialize_expr_grid grid_dimension z3_context in
+  let solver = mk_simple_solver z3_context in
+  let subgrid_constraints = get_subgrid_constraints expr_grid grid_dimension z3_context in
   begin
-    for index = 0 to (gridDimension - 1) do
-      let exprRow = exprGrid.(index) in
-      for colIndex = 0 to (gridDimension - 1) do
-        Solver.add solver [makeCellConstraints unsolvedGrid exprGrid index colIndex z3Context]
+    for index = 0 to (grid_dimension - 1) do
+      let expr_row = expr_grid.(index) in
+      for colIndex = 0 to (grid_dimension - 1) do
+        Solver.add solver [make_cell_constraints unsolved_grid expr_grid index colIndex z3_context]
       done;
-      Solver.add solver [getRowConstraints exprRow z3Context];
-      Solver.add solver [getColumnConstraints exprGrid index z3Context];
+      Solver.add solver [get_row_constraints expr_row z3_context];
+      Solver.add solver [get_column_constraints expr_grid index z3_context];
     done;
-    Solver.add solver subgridConstraints;
+    Solver.add solver subgrid_constraints;
   end;
   begin
     let status = Solver.check solver [] in
-    (status, Solver.get_model solver, exprGrid)
+    (status, Solver.get_model solver, expr_grid)
   end;;
 
-let getSolvedGrid model exprGrid =
-  exprGrid
-  |> Array.map ~f:(fun exprArray ->
-    exprArray
+let get_solved_grid model expr_grid =
+  expr_grid
+  |> Array.map ~f:(fun expr_array ->
+    expr_array
     |> Array.map ~f:(fun ex ->
-      match Model.evaluate model ex false with
-      | Some expr -> Expr.to_string expr
-      | None -> ""
-    ));;
+      match Model.get_const_interp_e model ex with
+      | Some interpretation ->
+        let interpreted_string = Expr.to_string interpretation |> String.to_array in
+        if Char.is_digit interpreted_string.(0) then Some (Char.to_int interpreted_string.(0)) else None
+      | None -> None));;
 
-let printGrid (grid : sudokuGrid) =
-  match grid with
-  | Unsolved _ ->
-    ()
-  | Solved _ -> ();;
+let print_grid (grid : int option array array) (fmt : Formatter.t) (dim : int) =
+  let print_row (row : int option array) =
+    let print_number_or_blank s =
+      match s with
+      | Some num -> Stdlib.Format.fprintf fmt "%u " num;
+      | None -> Stdlib.Format.fprintf fmt "  " in
+    begin Stdlib.Format.pp_open_hbox fmt () end;
+    row |>
+    Array.iteri ~f:(fun i s ->
+    if i > 0 && (Int.rem (i+1) dim = 0) then fprintf fmt "|| ";
+    if i > 0 && (Int.rem (i+1) dim <> 0) then fprintf fmt "| ";
+    print_number_or_blank s;
+    pp_close_box fmt ();
+    pp_print_cut fmt ();
+    ) in
+
 
 let () =
-  let testHard = "8--------,--36-----,-7--9-2--,-5---7---,----457--,---1---3-,--1----68,--85---1-,-9----4--" in
+  let test_hard = "8--------,--36-----,-7--9-2--,-5---7---,----457--,---1---3-,--1----68,--85---1-,-9----4--" in
   begin
-    let parsedSudokuString = parseSudokuString testHard in
-    let unsolvedGrid = Unsolved (parsedSudokuString) in
+    let parsed_sudoku_string = parse_sudoku_string test_hard in
+    let subgrid_dimension =
+      let grid_dim = Array.length parsed_sudoku_string in
+      Float.sqrt (Int.to_float grid_dim) |> Int.of_float in
+    let (status, model_opt, expr_grid) = solve_sudoku parsed_sudoku_string in
     begin
-      printGrid unsolvedGrid
+      print_grid parsed_sudoku_string std_formatter subgrid_dimension
     end;
-    let (status, modelOpt, exprGrid) = solveSudoku parsedSudokuString in
-    match (status, modelOpt) with
+    match (status, model_opt) with
       | Solver.UNSATISFIABLE, _ -> Stdio.print_string "Model doesn't have a solution"
       | Solver.UNKNOWN, _ -> Stdio.print_string "Nothing";
       | Solver.SATISFIABLE, None -> Stdio.print_string "Nothing";
       | Solver.SATISFIABLE, Some model ->
         Stdio.print_string "Model was satisfied";
-        let solvedGrid = Solved (getSolvedGrid model exprGrid) in
-        printGrid solvedGrid;
+        let solved_grid = get_solved_grid model expr_grid in
+        print_grid solved_grid std_formatter subgrid_dimension;
   end
