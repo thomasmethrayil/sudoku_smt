@@ -110,8 +110,8 @@ let print_grid (grid : int option array array) (dim : int) =
       | None -> printf "  " in
     row |>
     Array.iteri ~f:(fun i s ->
-      if i > 0 && (Int.rem (i+1) dim = 0) then  printf "|| ";
-      if i > 0 && (Int.rem (i+1) dim <> 0) then printf "| ";
+      if i > 0 && (Int.rem i dim = 0) then  printf "|| ";
+      if i > 0 && (Int.rem i dim <> 0) then printf "| ";
       print_number_or_blank s;
     );
     printf "\n" in
@@ -137,14 +137,15 @@ let () =
       Float.sqrt (Int.to_float grid_dim) |> Int.of_float in
     let (status, model_opt, expr_grid) = solve_sudoku parsed_sudoku_string in
     begin
+      Stdio.print_string "Initial puzzle : \n";
       print_grid parsed_sudoku_string subgrid_dimension
     end;
     match (status, model_opt) with
-      | Solver.UNSATISFIABLE, _ -> Stdio.print_string "Model doesn't have a solution"
+      | Solver.UNSATISFIABLE, _ -> Stdio.print_string "Model doesn't have a solution\n"
       | Solver.UNKNOWN, _ -> Stdio.print_string "Nothing";
       | Solver.SATISFIABLE, None -> Stdio.print_string "Nothing";
       | Solver.SATISFIABLE, Some model ->
-        Stdio.print_string "Model was satisfied";
+        Stdio.print_string "Model was satisfied\n";
         let solved_grid = get_solved_grid model expr_grid in
         print_grid solved_grid subgrid_dimension;
   end
