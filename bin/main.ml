@@ -1,5 +1,5 @@
 open Base
-open Base.Printf
+open Stdio.Out_channel
 open Z3
 open Z3.Arithmetic
 open Z3.Solver
@@ -8,7 +8,7 @@ let split_sudoku_rows sudoku_string = sudoku_string |> String.split ~on:(',') |>
 
 let split_row_to_int_cells row_string =
   Array.init (String.length row_string) ~f:(String.get row_string)
-  |> Array.map ~f: (fun c -> if Char.is_digit c then Some (Char.to_int c) else None);;
+  |> Array.map ~f: (fun c -> if Char.is_digit c then Char.get_digit c else None);;
 
 let split_rows_to_int_grid string_array = string_array |> Array.map ~f:(fun s -> split_row_to_int_cells s);;
 
@@ -26,7 +26,7 @@ let make_cell_constraints grid expr_grid row_index col_index ctx =
   | Some num -> Boolean.mk_eq ctx current_position (Integer.mk_numeral_i ctx num)
   | None ->
     let gt_0, le_9 =
-    mk_ge ctx current_position (Integer.mk_numeral_i ctx 0), mk_le ctx current_position (Integer.mk_numeral_i ctx 9) in
+    mk_gt ctx current_position (Integer.mk_numeral_i ctx 0), mk_le ctx current_position (Integer.mk_numeral_i ctx 9) in
     Boolean.mk_and ctx [gt_0; le_9];;
 
 let get_row_constraints expr_row ctx =
@@ -99,25 +99,34 @@ let get_solved_grid model expr_grid =
       match Model.get_const_interp_e model ex with
       | Some interpretation ->
         let interpreted_string = Expr.to_string interpretation |> String.to_array in
-        if Char.is_digit interpreted_string.(0) then Some (Char.to_int interpreted_string.(0)) else None
+        if Char.is_digit interpreted_string.(0) then Char.get_digit interpreted_string.(0) else None
       | None -> None));;
 
-let print_grid (grid : int option array array) (fmt : Formatter.t) (dim : int) =
+let print_grid (grid : int option array array) (dim : int) =
   let print_row (row : int option array) =
     let print_number_or_blank s =
       match s with
-      | Some num -> Stdlib.Format.fprintf fmt "%u " num;
-      | None -> Stdlib.Format.fprintf fmt "  " in
-    begin Stdlib.Format.pp_open_hbox fmt () end;
+      | Some num -> printf "%u " num;
+      | None -> printf "  " in
     row |>
     Array.iteri ~f:(fun i s ->
-    if i > 0 && (Int.rem (i+1) dim = 0) then fprintf fmt "|| ";
-    if i > 0 && (Int.rem (i+1) dim <> 0) then fprintf fmt "| ";
-    print_number_or_blank s;
-    pp_close_box fmt ();
-    pp_print_cut fmt ();
-    ) in
-
+      if i > 0 && (Int.rem (i+1) dim = 0) then  printf "|| ";
+      if i > 0 && (Int.rem (i+1) dim <> 0) then printf "| ";
+      print_number_or_blank s;
+    );
+    printf "\n" in
+  let grid_length = Array.length grid in
+  let separator_length = (dim * grid_length) + (dim - 1) - 1 in
+  let print_separator_line =
+    for _ = 0 to (separator_length - 1) do
+      printf "-" done;
+    printf "\n" in
+  print_separator_line;
+  grid
+    |> Array.iteri ~f:(fun i r ->
+      if i > 0 && (Int.rem (i + 1) dim = 0) && (grid_length <> (i+1)) then print_separator_line;
+      print_row r;
+    );;
 
 let () =
   let test_hard = "8--------,--36-----,-7--9-2--,-5---7---,----457--,---1---3-,--1----68,--85---1-,-9----4--" in
@@ -128,7 +137,7 @@ let () =
       Float.sqrt (Int.to_float grid_dim) |> Int.of_float in
     let (status, model_opt, expr_grid) = solve_sudoku parsed_sudoku_string in
     begin
-      print_grid parsed_sudoku_string std_formatter subgrid_dimension
+      print_grid parsed_sudoku_string subgrid_dimension
     end;
     match (status, model_opt) with
       | Solver.UNSATISFIABLE, _ -> Stdio.print_string "Model doesn't have a solution"
@@ -137,5 +146,5 @@ let () =
       | Solver.SATISFIABLE, Some model ->
         Stdio.print_string "Model was satisfied";
         let solved_grid = get_solved_grid model expr_grid in
-        print_grid solved_grid std_formatter subgrid_dimension;
+        print_grid solved_grid subgrid_dimension;
   end
