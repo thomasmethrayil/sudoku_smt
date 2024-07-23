@@ -223,10 +223,16 @@ let () =
           (fun (p, i_opt) -> load_puzzle_and_solve p i_opt)
           lines)
   in
-
+  let num_of_threads =
+    match Sys.getenv "num_threads" with
+    | Some num -> Int.of_string num
+    | None -> Domain.recommended_domain_count ()
+  in
   Eio_main.run @@ fun env ->
   Switch.run @@ fun sw ->
   let pool =
-    Eio.Executor_pool.create ~sw (Eio.Stdenv.domain_mgr env) ~domain_count:5
+    Eio.Executor_pool.create ~sw
+      (Eio.Stdenv.domain_mgr env)
+      ~domain_count:num_of_threads
   in
   main ~pool
