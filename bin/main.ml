@@ -210,19 +210,23 @@ let load_puzzle_and_solve sudoku_string puzzle_number_opt =
   | Solver.SATISFIABLE, Some model ->
       Stdio.print_string "\n Model was satisfied \n\n";
       let solved_grid = get_solved_grid model expr_grid in
-      print_grid solved_grid subgrid_dimension;;
+      print_grid solved_grid subgrid_dimension
 
 let () =
   let filepath = "/Users/thomas/code/sudoku_smt/input/test_6" in
-  let lines = In_channel.read_lines filepath |> List.mapi ~f:(fun i p -> (p, Some i)) in
-  let main ~pool = 
-  (Eio.Executor_pool.submit_exn pool ~weight:1.0
-        (fun () -> Eio.Fiber.List.iter (fun (p, i_opt) -> load_puzzle_and_solve p i_opt) lines)) in
+  let lines =
+    In_channel.read_lines filepath |> List.mapi ~f:(fun i p -> (p, Some i))
+  in
+  let main ~pool =
+    Eio.Executor_pool.submit_exn pool ~weight:1.0 (fun () ->
+        Eio.Fiber.List.iter
+          (fun (p, i_opt) -> load_puzzle_and_solve p i_opt)
+          lines)
+  in
 
   Eio_main.run @@ fun env ->
   Switch.run @@ fun sw ->
-    let pool =
-      Eio.Executor_pool.create
-      ~sw (Eio.Stdenv.domain_mgr env)
-      ~domain_count:5 in
+  let pool =
+    Eio.Executor_pool.create ~sw (Eio.Stdenv.domain_mgr env) ~domain_count:5
+  in
   main ~pool
