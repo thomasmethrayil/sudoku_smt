@@ -49,7 +49,8 @@ let parse_sudoku_string sudoku_string puzzle_number =
         failwith err_str
     | _ ->
         sanitized_string
-        |> List.map ~f:(fun c -> Char.get_digit c)
+        |> List.map ~f:(fun c ->
+               if Char.( = ) '0' c then None else Char.get_digit c)
         |> chunk_to_array row_length
 
 let initialize_expr_grid grid_dimension ctx =
@@ -219,7 +220,9 @@ let load_and_solve_puzzles_from_file filepath =
     raise e
 
 let () =
-  let test_hard =
-    "8--------,--36-----,-7--9-2--,-5---7---,----457--,---1---3-,--1----68,--85---1-,-9----4--"
-  in
-  load_puzzle_and_solve test_hard None
+  let filepath = "/Users/thomas/code/sudoku_smt/input/so_hard" in
+  load_and_solve_puzzles_from_file filepath
+(* let test_hard =
+     "8--------,--36-----,-7--9-2--,-5---7---,----457--,---1---3-,--1----68,--85---1-,-9----4--"
+   in
+   load_puzzle_and_solve test_hard None*)
