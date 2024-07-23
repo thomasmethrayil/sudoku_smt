@@ -220,8 +220,15 @@ let load_and_solve_puzzles_from_file filepath =
     raise e
 
 let () =
+  let time f x =
+    let start = Unix.gettimeofday () in
+    let res = f x in
+    let stop = Unix.gettimeofday () in
+    let () = printf "Execution time: %fs\n%!" (stop -. start) in
+    res
+  in
   let filepath = "/Users/thomas/code/sudoku_smt/input/so_hard" in
-  load_and_solve_puzzles_from_file filepath
+  time load_and_solve_puzzles_from_file filepath
 (* let test_hard =
      "8--------,--36-----,-7--9-2--,-5---7---,----457--,---1---3-,--1----68,--85---1-,-9----4--"
    in
