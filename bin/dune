@@ -1,4 +1,4 @@
 (executable
  (public_name sudoku_smt)
  (name main)
- (libraries base stdio z3))
+ (libraries base stdio eio eio_main z3))

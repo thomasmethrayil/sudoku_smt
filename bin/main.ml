@@ -1,5 +1,6 @@
 open Base
 open Stdio
+open Eio.Std
 open Z3
 open Z3.Arithmetic
 open Z3.Solver
@@ -207,29 +208,21 @@ let load_puzzle_and_solve sudoku_string puzzle_number_opt =
         "Solver did not return an assignment despite the existence of \
          satisfying assignments\n"
   | Solver.SATISFIABLE, Some model ->
-      Stdio.print_string "\nModel was satisfied\n\n";
+      Stdio.print_string "\n Model was satisfied \n\n";
       let solved_grid = get_solved_grid model expr_grid in
-      print_grid solved_grid subgrid_dimension
-
-let load_and_solve_puzzles_from_file filepath =
-  try
-    In_channel.read_lines filepath
-    |> List.iteri ~f:(fun i p -> load_puzzle_and_solve p (Some i))
-  with e ->
-    eprintf "There was an exception : %s" (Exn.to_string e);
-    raise e
+      print_grid solved_grid subgrid_dimension;;
 
 let () =
-  let time f x =
-    let start = Unix.gettimeofday () in
-    let res = f x in
-    let stop = Unix.gettimeofday () in
-    let () = printf "Execution time: %fs\n%!" (stop -. start) in
-    res
-  in
-  let filepath = "/Users/thomas/code/sudoku_smt/input/so_hard" in
-  time load_and_solve_puzzles_from_file filepath
-(* let test_hard =
-     "8--------,--36-----,-7--9-2--,-5---7---,----457--,---1---3-,--1----68,--85---1-,-9----4--"
-   in
-   load_puzzle_and_solve test_hard None*)
+  let filepath = "/Users/thomas/code/sudoku_smt/input/test_6" in
+  let lines = In_channel.read_lines filepath |> List.mapi ~f:(fun i p -> (p, Some i)) in
+  let main ~pool = 
+  (Eio.Executor_pool.submit_exn pool ~weight:1.0
+        (fun () -> Eio.Fiber.List.iter (fun (p, i_opt) -> load_puzzle_and_solve p i_opt) lines)) in
+
+  Eio_main.run @@ fun env ->
+  Switch.run @@ fun sw ->
+    let pool =
+      Eio.Executor_pool.create
+      ~sw (Eio.Stdenv.domain_mgr env)
+      ~domain_count:5 in
+  main ~pool
