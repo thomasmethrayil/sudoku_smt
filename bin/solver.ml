@@ -35,7 +35,7 @@ let parse_sudoku_string sudoku_string puzzle_number =
         sanitized_string
         |> List.map ~f:(fun c ->
                if Char.( = ) '0' c then None else Char.get_digit c)
-        |> Auxiliary.chunk_to_array row_length
+        |> let open Auxiliary in chunk_to_array row_length
 
 let initialize_expr_grid grid_dimension ctx =
   let position_name = Printf.sprintf "x_%d_%d" in
