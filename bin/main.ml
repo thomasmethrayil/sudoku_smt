@@ -51,14 +51,15 @@ let () =
       ~domain_count:num_of_threads
   in
   let command =
-    Command.basic ~summary:"Solve sudoku puzzles from file"
+    let module C = Command in
+    C.basic ~summary:"Solve sudoku puzzles from file"
       ~readme:(fun () ->
         "This program takes in a compulsory filename argument eg. dune exec -- \
          sudoku_smt ./input/test_6 for a file containing 1 or more sudoku \
          puzzles. The puzzles can be encoded using '-' or '0' for empty cells. \
          Please take care to encode each puzzle in one line only. Do not \
          create any empty lines between puzzles.")
-      Command.Param.(
+      C.Param.(
         map
           (anon ("filename" %: string))
           ~f:(fun filename () -> main filename ~pool))
