@@ -1,4 +1,5 @@
 open Base
+open Stdio
 open Z3
 open Z3.Arithmetic
 open Z3.Solver
@@ -35,7 +36,9 @@ let parse_sudoku_string sudoku_string puzzle_number =
         sanitized_string
         |> List.map ~f:(fun c ->
                if Char.( = ) '0' c then None else Char.get_digit c)
-        |> let open Auxiliary in chunk_to_array row_length
+        |>
+        let open Auxiliary in
+        chunk_to_array row_length
 
 let initialize_expr_grid grid_dimension ctx =
   let position_name = Printf.sprintf "x_%d_%d" in
@@ -141,3 +144,29 @@ let get_solved_grid model expr_grid =
                       Char.get_digit interpreted_string.(0)
                     else None
                 | None -> None))
+
+let load_puzzle_and_solve sudoku_string puzzle_number_opt =
+  let module A = Auxiliary in
+  let module Z = Z3.Solver in
+  let puzzle_number =
+    match puzzle_number_opt with Some num -> num | None -> 1
+  in
+  let parsed_sudoku_string = parse_sudoku_string sudoku_string puzzle_number in
+  let subgrid_dimension =
+    let grid_dim = Array.length parsed_sudoku_string in
+    Float.sqrt (Int.to_float grid_dim) |> Int.of_float
+  in
+  let status, model_opt, expr_grid = solve_sudoku parsed_sudoku_string in
+  printf "Initial puzzle for puzzle no %u: \n" puzzle_number;
+  A.print_grid parsed_sudoku_string subgrid_dimension;
+  match (status, model_opt) with
+  | Z.UNSATISFIABLE, _ -> Stdio.print_string "Model doesn't have a solution\n"
+  | Z.UNKNOWN, _ -> Stdio.print_string "Solver status unknown\n"
+  | Z.SATISFIABLE, None ->
+      Stdio.print_string
+        "Solver did not return an assignment despite the existence of \
+         satisfying assignments\n"
+  | Z.SATISFIABLE, Some model ->
+      Stdio.print_string "\n Model was satisfied \n\n";
+      let solved_grid = get_solved_grid model expr_grid in
+      A.print_grid solved_grid subgrid_dimension
