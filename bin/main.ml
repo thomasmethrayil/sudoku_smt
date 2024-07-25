@@ -32,26 +32,28 @@ let load_puzzle_and_solve sudoku_string puzzle_number_opt =
       A.print_grid solved_grid subgrid_dimension
 
 let () =
-  let parse_and_solve filename ~pool =
-    let lines =
-      In_channel.read_lines filename |> List.mapi ~f:(fun i p -> (p, Some i))
-    in
-    Executor_pool.submit_exn pool ~weight:1.0 (fun () ->
-        Fiber.List.iter (fun (p, i_opt) -> load_puzzle_and_solve p i_opt) lines)
-  in
-  let num_of_threads =
-    match Sys.getenv "num_threads" with
-    | Some num -> Int.of_string num
-    | None -> Domain.recommended_domain_count ()
-  in
   let run_event_pool filename =
+    let parse_and_solve filename ~pool =
+      let lines =
+        In_channel.read_lines filename |> List.mapi ~f:(fun i p -> (p, Some i))
+      in
+      Executor_pool.submit_exn pool ~weight:1.0 (fun () ->
+          Fiber.List.iter
+            (fun (p, i_opt) -> load_puzzle_and_solve p i_opt)
+            lines)
+    in
+    let num_of_threads =
+      match Sys.getenv "num_threads" with
+      | Some num -> Int.of_string num
+      | None -> Domain.recommended_domain_count ()
+    in
     Eio_main.run @@ fun env ->
     Switch.run @@ fun sw ->
     let pool =
       Executor_pool.create ~sw (Stdenv.domain_mgr env)
         ~domain_count:num_of_threads
     in
-  parse_and_solve xi filename ~pool
+    parse_and_solve filename ~pool
   in
   let command =
     let module C = Command in
