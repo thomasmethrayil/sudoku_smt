@@ -48,11 +48,5 @@ let () =
               parse_and_solve ~pool)
             else printf "The input file %s: does not contain any puzzles" filename))
   in
-  let time f =
-    let start = Unix.gettimeofday () in
-    let stop = Unix.gettimeofday () in
-    let () = printf "Execution time: %fs\n%!" (stop -. start) in
-    f
-  in
-  Command_unix.run ~version:"1.0" ~build_info:"RWO" (time command)
+  Command_unix.run ~version:"1.0" ~build_info:"RWO" command
 ;;
