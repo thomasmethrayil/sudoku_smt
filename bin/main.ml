@@ -32,7 +32,7 @@ let load_puzzle_and_solve sudoku_string puzzle_number_opt =
       A.print_grid solved_grid subgrid_dimension
 
 let () =
-  let main filename ~pool =
+  let parse_and_solve filename ~pool =
     let lines =
       In_channel.read_lines filename |> List.mapi ~f:(fun i p -> (p, Some i))
     in
@@ -44,11 +44,14 @@ let () =
     | Some num -> Int.of_string num
     | None -> Domain.recommended_domain_count ()
   in
-  Eio_main.run @@ fun env ->
-  Switch.run @@ fun sw ->
-  let pool =
-    Executor_pool.create ~sw (Stdenv.domain_mgr env)
-      ~domain_count:num_of_threads
+  let run_event_pool filename =
+    Eio_main.run @@ fun env ->
+    Switch.run @@ fun sw ->
+    let pool =
+      Executor_pool.create ~sw (Stdenv.domain_mgr env)
+        ~domain_count:num_of_threads
+    in
+  parse_and_solve xi filename ~pool
   in
   let command =
     let module C = Command in
@@ -62,6 +65,6 @@ let () =
       C.Param.(
         map
           (anon ("filename" %: string))
-          ~f:(fun filename () -> main filename ~pool))
+          ~f:(fun filename () -> run_event_pool filename))
   in
   Command_unix.run ~version:"1.0" ~build_info:"RWO" command
