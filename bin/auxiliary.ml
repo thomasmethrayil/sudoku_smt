@@ -15,32 +15,33 @@ let chunk_to_array size list =
   work list 0 [] [] |> List.map ~f:(fun l -> Array.of_list l) |> Array.of_list
 ;;
 
-let print_grid grid dim =
-  let print_row row =
+type row_to_print =
+  { row : int option array
+  ; print : bool
+  }
+
+let print_grid grid cell_dim =
+  let grid_length = Array.length grid in
+  let separator_length = cell_dim * grid_length in
+  let separator_line = Array.init separator_length ~f:(fun _ -> '-') |> String.of_array in
+  let print_row row_info =
+    if row_info.print then printf "%s\n" separator_line;
     let print_number_or_blank s =
       match s with
       | Some num -> printf "%u " num
       | None -> printf "  "
     in
-    row
+    row_info.row
     |> Array.iteri ~f:(fun i s ->
-      if i > 0 && Int.rem i dim = 0 then printf "|| ";
-      if i > 0 && Int.rem i dim <> 0 then printf "| ";
+      if i > 0 && Int.rem i cell_dim = 0 then printf "| ";
+      if i > 0 && Int.rem i cell_dim <> 0 then printf " ";
       print_number_or_blank s);
     printf "\n"
   in
-  let grid_length = Array.length grid in
-  (*Length computation of separator is not of much use as the '-' character occupies much less space in the terminal unless we use Format's boxes for pretty printing*)
-  let separator_length = (dim * grid_length) + (dim - 1) - 1 in
-  let print_separator_line =
-    for _ = 0 to separator_length - 1 do
-      printf "-"
-    done;
-    printf "\n"
-  in
-  print_separator_line;
+  printf "%s\n" separator_line;
   grid
   |> Array.iteri ~f:(fun i r ->
-    if i > 0 && Int.rem (i + 1) dim = 0 && grid_length <> i + 1 then print_separator_line;
-    print_row r)
+    if i > 0 && Int.rem i cell_dim = 0 && grid_length <> i + 1
+    then print_row { row = r; print = true }
+    else print_row { row = r; print = false })
 ;;

@@ -3,6 +3,13 @@ open Stdio
 open Eio
 
 let () =
+  let time f x =
+    let start = Unix.gettimeofday () in
+    let res = f x in
+    let stop = Unix.gettimeofday () in
+    let () = printf "Execution time: %fs\n%!" (stop -. start) in
+    res
+  in
   let command =
     let module C = Command in
     C.basic
@@ -48,5 +55,5 @@ let () =
               parse_and_solve ~pool)
             else printf "The input file %s: does not contain any puzzles" filename))
   in
-  Command_unix.run ~version:"1.0" ~build_info:"RWO" command
+  time (Command_unix.run ~version:"1.0" ~build_info:"RWO") command
 ;;
